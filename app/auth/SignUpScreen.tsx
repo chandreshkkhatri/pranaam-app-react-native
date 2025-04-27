@@ -1,19 +1,20 @@
 import { useState } from "react";
-import { supabase } from "../../lib/supabase";
 import { View, Text, TextInput, Pressable, Alert } from "react-native";
+import { useRouter } from "expo-router"; // ← import this
+import { supabase } from "../../lib/supabase"; // adjust path
 
-export default function SignupScreen({ navigation }: any) {
+export default function SignupScreen() {
+  const router = useRouter(); // ← get the router
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   async function handleSignup() {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+    const { error } = await supabase.auth.signUp({ email, password });
     if (error) Alert.alert("Error", error.message);
-    else Alert.alert("Success", "Check your email to confirm signup!");
+    else {
+      Alert.alert("Success", "Check your email for confirmation.");
+      router.replace("/auth/LoginScreen"); // ← send them back to login
+    }
   }
 
   return (
@@ -41,7 +42,7 @@ export default function SignupScreen({ navigation }: any) {
         <Text style={{ color: "white", textAlign: "center" }}>Sign Up</Text>
       </Pressable>
 
-      <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
+      <Pressable onPress={() => router.back()} style={{ marginTop: 12 }}>
         <Text style={{ textAlign: "center" }}>
           Already have an account? Login
         </Text>

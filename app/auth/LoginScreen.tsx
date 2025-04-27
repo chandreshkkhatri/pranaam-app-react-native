@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { supabase } from "../../lib/supabase";
 import { View, Text, TextInput, Pressable, Alert } from "react-native";
+import { useRouter } from "expo-router"; // ← import this
+import { supabase } from "../../lib/supabase"; // adjust path
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen() {
+  const router = useRouter(); // ← get the router
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -11,8 +13,8 @@ export default function LoginScreen({ navigation }: any) {
       email,
       password,
     });
-
     if (error) Alert.alert("Error", error.message);
+    else router.replace("/(tabs)"); // ← on success, go to your tabs
   }
 
   return (
@@ -41,7 +43,7 @@ export default function LoginScreen({ navigation }: any) {
       </Pressable>
 
       <Pressable
-        onPress={() => navigation.navigate("Signup")}
+        onPress={() => router.push("/auth/SignUpScreen")}
         style={{ marginTop: 12 }}
       >
         <Text style={{ textAlign: "center" }}>
