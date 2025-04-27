@@ -24,21 +24,21 @@ const LANGUAGES = [
 type Recipient = {
   id: string;
   name: string;
-  lastUsedAt?: number; // epoch ms
+  number: string;
+  lastUsedAt?: number;
 };
 
 export default function TabOneScreen() {
-  /* ──────────────────────────────── state ─────────────────────────────── */
   const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
   const [query, setQuery] = useState("");
+  const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
 
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
-  /* ────────────────────── permission + contacts cache ─────────────────── */
   useEffect(() => {
     (async () => {
       const { status } = await Contacts.requestPermissionsAsync();
@@ -53,74 +53,105 @@ export default function TabOneScreen() {
       }
 
       const { data } = await Contacts.getContactsAsync({
-        fields: [Contacts.Fields.Name],
-        pageSize: 200,
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
       });
-      setDeviceContacts(data.filter((c) => !!c.id && !!c.name));
+
+      setDeviceContacts(data.filter((c) => c.name && c.phoneNumbers?.length));
     })();
   }, [language.code]);
 
-  /* ───────────────────────────── helpers ──────────────────────────────── */
-  const filteredContacts = useMemo(
-    () =>
-      deviceContacts.filter((c) =>
-        c.name?.toLowerCase().includes(query.toLowerCase())
-      ),
-    [deviceContacts, query]
+  const filteredContacts = useMemo(() => {
+    const lowerQuery = query.toLowerCase();
+    const results: { id: string; name: string; number: string }[] = [];
+
+    deviceContacts.forEach((contact, contactIndex) => {
+      if (!contact.id || !contact.name) return;
+
+      contact.phoneNumbers?.forEach((phone, phoneIndex) => {
+        if (!phone.number) return;
+
+        const nameMatch = contact.name.toLowerCase().includes(lowerQuery);
+        const numberMatch = phone.number
+          .replace(/\s+/g, "")
+          .includes(lowerQuery);
+
+        if (nameMatch || numberMatch) {
+          results.push({
+            id: `${contact.id}_${contactIndex}_${phoneIndex}`, // 🔥 guaranteed unique
+            name: contact.name,
+            number: phone.number,
+          });
+        }
+      });
+    });
+
+    return results;
+  }, [deviceContacts, query]);
+
+  const addRecipient = useCallback(
+    (contact: { id: string; name: string; number: string }) => {
+      setRecipients((prev) => {
+        if (prev.some((r) => r.id === contact.id)) return prev;
+        return [
+          ...prev,
+          { id: contact.id, name: contact.name, number: contact.number },
+        ];
+      });
+      setQuery("");
+      setSearchDropdownVisible(false);
+      Keyboard.dismiss();
+    },
+    []
   );
 
-  const addRecipient = useCallback((contact: Contacts.Contact) => {
-    if (!contact.id || !contact.name) return;
-    const id = contact.id as string;
-    const name = contact.name as string;
-    setRecipients((prev): Recipient[] => {
-      if (prev.some((r) => r.id === id)) return prev;
-      return [...prev, { id, name }];
+  const toggleRecipientSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
     });
-    setQuery("");
-    Keyboard.dismiss();
   }, []);
 
   const removeRecipient = useCallback((id: string) => {
     setRecipients((prev) => prev.filter((r) => r.id !== id));
-    setSelectedId((prev) => (prev === id ? null : prev));
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
   }, []);
 
   const sendPranaam = useCallback(() => {
-    if (!selectedId) return;
+    if (selectedIds.size === 0) return;
+
     setRecipients((prev) =>
       prev
         .map((r) =>
-          r.id === selectedId ? { ...r, lastUsedAt: Date.now() } : r
+          selectedIds.has(r.id) ? { ...r, lastUsedAt: Date.now() } : r
         )
         .sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0))
     );
     Alert.alert("जय श्री राम 🙏", "Greeting sent!");
-  }, [selectedId]);
+    setSelectedIds(new Set());
+  }, [selectedIds]);
 
   const inviteOthers = useCallback(async () => {
     try {
       await Share.share({
         message:
-          "Join me on Pranaam – send respectful greetings with a tap! https://pranaam.app", // hypothetical link
+          "Join me on Pranaam – send respectful greetings with a tap! https://pranaam.app",
       });
     } catch (e) {
       console.error(e);
     }
   }, []);
 
-  /* ──────────────────────────── renderers ─────────────────────────────── */
-  const renderRecipient = ({ item }: { item: Recipient }) => (
-    <Pressable
-      onPress={() => setSelectedId(item.id)}
-      onLongPress={() => removeRecipient(item.id)}
-      style={[styles.row, item.id === selectedId && styles.rowSelected]}
-    >
-      <Text style={styles.rowText}>{item.name}</Text>
-    </Pressable>
-  );
+  /* ──────────────────────────────── UI ───────────────────────────────── */
 
-  /* ─────────────────────────────── UI ─────────────────────────────────── */
   return (
     <SafeAreaView
       style={[
@@ -134,99 +165,118 @@ export default function TabOneScreen() {
         },
       ]}
     >
-      {/* ── Language selector ─────────────────────────────────────────── */}
-      <View style={styles.langWrap} pointerEvents="box-none">
-        <Pressable
-          style={styles.langBtn}
-          onPress={() => setLangMenuOpen((o) => !o)}
-        >
-          <Text style={styles.langBtnText}>{language.label}</Text>
-        </Pressable>
-        {langMenuOpen && (
-          <View style={styles.langMenu}>
-            {LANGUAGES.map((lng) => (
-              <Pressable
-                key={lng.code}
-                style={styles.langMenuItem}
-                onPress={() => {
-                  setLanguage(lng);
-                  setLangMenuOpen(false);
-                }}
-              >
-                <Text style={styles.langMenuText}>{lng.label}</Text>
-              </Pressable>
-            ))}
+      <View style={{ flex: 1 }}>
+        {/* ── Search bar + Lang selector ── */}
+        <View style={styles.searchRowContainer}>
+          <TextInput
+            placeholder={
+              language.code === "hi"
+                ? "संपर्क खोजें…"
+                : "Search contacts to add…"
+            }
+            placeholderTextColor={COLORS.saffronLight}
+            style={styles.search}
+            value={query}
+            onFocus={() => setSearchDropdownVisible(true)}
+            onChangeText={(text) => {
+              setQuery(text);
+              if (text.length === 0) setSearchDropdownVisible(false);
+              else setSearchDropdownVisible(true);
+            }}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <Pressable
+            style={styles.langBtn}
+            onPress={() => setLangMenuOpen((o) => !o)}
+          >
+            <Text style={styles.langBtnText}>{language.label}</Text>
+          </Pressable>
+        </View>
+
+        {/* ── Floating Dropdown ── */}
+        {searchDropdownVisible && query.length > 0 && (
+          <View style={styles.dropdownAbsoluteContainer}>
+            <FlatList
+              data={filteredContacts.slice(0, 20)}
+              keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.dropdownRow}
+                  onPress={() => addRecipient(item)}
+                >
+                  <View>
+                    <Text style={styles.dropdownText}>{item.name}</Text>
+                    <Text style={styles.dropdownSubText}>{item.number}</Text>
+                  </View>
+                  <Text style={styles.addTag}>ADD</Text>
+                </Pressable>
+              )}
+            />
           </View>
         )}
-      </View>
 
-      {/* ── Search bar ─────────────────────────────────────────────────── */}
-      <TextInput
-        placeholder={
-          language.code === "hi" ? "संपर्क खोजें…" : "Search contacts to add…"
-        }
-        placeholderTextColor={COLORS.saffronLight}
-        style={styles.search}
-        value={query}
-        onChangeText={setQuery}
-        autoCorrect={false}
-        autoCapitalize="none"
-      />
-
-      {/* ── Search results drop-down ────────────────────────────────────── */}
-      {query.length > 0 && (
+        {/* ── Recipients List ── */}
+        <Text style={GLOBAL.title}>My Recipients</Text>
         <FlatList
-          data={filteredContacts.slice(0, 8)}
-          keyExtractor={(c) => c.id!}
-          keyboardShouldPersistTaps="handled"
+          data={recipients}
+          keyExtractor={(item) => item.id}
+          style={styles.recipientList}
+          getItemLayout={(_, index) => ({
+            length: SIZES.recipientRow,
+            offset: SIZES.recipientRow * index,
+            index,
+          })}
           renderItem={({ item }) => (
             <Pressable
-              style={styles.searchRow}
-              onPress={() => addRecipient(item)}
+              style={[
+                styles.row,
+                selectedIds.has(item.id) && styles.rowSelected,
+              ]}
+              onPress={() => toggleRecipientSelection(item.id)}
             >
-              <Text style={styles.searchText}>{item.name}</Text>
-              <Text style={styles.addTag}>ADD</Text>
+              <View>
+                <Text style={styles.rowText}>{item.name}</Text>
+                <Text style={styles.rowSubText}>{item.number}</Text>
+              </View>
+              <Pressable
+                onPress={() => removeRecipient(item.id)}
+                style={styles.removeButton}
+              >
+                <Text style={styles.removeText}>✖️</Text>
+              </Pressable>
             </Pressable>
           )}
+          ListEmptyComponent={() => (
+            <Text style={{ color: COLORS.white, opacity: 0.7 }}>
+              {language.code === "hi"
+                ? "कोई प्राप्तकर्ता नहीं"
+                : "No recipients yet"}
+            </Text>
+          )}
         />
-      )}
 
-      {/* ── Recipient list ──────────────────────────────────────────────── */}
-      <Text style={GLOBAL.title}>My Recipients</Text>
-      <FlatList
-        data={recipients}
-        keyExtractor={(item) => item.id}
-        renderItem={renderRecipient}
-        style={styles.recipientList}
-        getItemLayout={(_, index) => ({
-          length: SIZES.recipientRow,
-          offset: SIZES.recipientRow * index,
-          index,
-        })}
-        ListEmptyComponent={() => (
-          <Text style={{ color: COLORS.white, opacity: 0.7 }}>
-            {language.code === "hi"
-              ? "कोई प्राप्तकर्ता नहीं"
-              : "No recipients yet"}
-          </Text>
-        )}
-      />
+        {/* ── Invite + Pranaam buttons ── */}
+        <View style={styles.bottomGroup}>
+          <Pressable style={styles.inviteBtn} onPress={inviteOthers}>
+            <Text style={styles.inviteText}>
+              {language.code === "hi" ? "इनवाइट भेजें" : "Invite friends"}
+            </Text>
+          </Pressable>
 
-      {/* ── Invite button ──────────────────────────────────────────────── */}
-      <Pressable style={styles.inviteBtn} onPress={inviteOthers}>
-        <Text style={styles.inviteText}>
-          {language.code === "hi" ? "इनवाइट भेजें" : "Invite friends"}
-        </Text>
-      </Pressable>
-
-      {/* ── Big send button ─────────────────────────────────────────────── */}
-      <Pressable
-        style={[styles.sendButton, !selectedId && { opacity: 0.5 }]}
-        disabled={!selectedId}
-        onPress={sendPranaam}
-      >
-        <Text style={styles.sendText}>जय श्री राम</Text>
-      </Pressable>
+          <Pressable
+            style={[
+              styles.sendButton,
+              selectedIds.size === 0 && { opacity: 0.5 },
+            ]}
+            disabled={selectedIds.size === 0}
+            onPress={sendPranaam}
+          >
+            <Text style={styles.sendText}>जय श्री राम</Text>
+          </Pressable>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -272,37 +322,77 @@ const styles = StyleSheet.create({
   },
   langMenuText: { color: COLORS.textDark },
 
+  addTag: { color: COLORS.saffron, fontWeight: "700" },
+
+  searchRowContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+
   /* Search bar */
   search: {
-    marginTop: 60, // below Lang button safely
+    flex: 1,
     height: 42,
     borderRadius: SIZES.radius,
     backgroundColor: COLORS.white,
     paddingHorizontal: 12,
     color: COLORS.textDark,
-    marginBottom: 10,
   },
-  searchRow: {
+
+  /* Floating dropdown container */
+  dropdownAbsoluteContainer: {
+    position: "absolute",
+    top: 70, // adjust based on your design
+    left: SIZES.padding,
+    right: SIZES.padding,
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.radius,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    maxHeight: 250,
+    zIndex: 100,
+  },
+
+  /* Each dropdown item */
+  dropdownRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 12,
     paddingVertical: 10,
-    borderBottomColor: COLORS.saffronLight,
+    paddingHorizontal: 12,
     borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.saffronLight,
   },
-  searchText: { color: COLORS.textDark },
-  addTag: { color: COLORS.saffron, fontWeight: "700" },
 
-  /* Recipient list */
+  dropdownText: {
+    color: COLORS.textDark,
+    fontSize: 16,
+  },
+
+  /* Number text under name */
+  dropdownSubText: {
+    color: COLORS.saffron,
+    fontSize: 12,
+    marginTop: 2,
+  },
+
   recipientList: {
-    maxHeight: SIZES.recipientRow * 4,
+    maxHeight: SIZES.recipientRow * 6,
     marginBottom: 16,
   },
+
+  /* Single row */
   row: {
+    flexDirection: "row",
+    alignItems: "center",
     height: SIZES.recipientRow,
     backgroundColor: COLORS.white,
-    justifyContent: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     borderRadius: SIZES.radius,
     marginBottom: 8,
@@ -312,22 +402,49 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
+
+  /* Selected highlight */
   rowSelected: {
     backgroundColor: COLORS.saffronLight,
   },
-  rowText: { color: COLORS.textDark, fontSize: 16 },
 
-  /* Invite button */
+  /* Name text in row */
+  rowText: {
+    color: COLORS.textDark,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  /* Number text in row */
+  rowSubText: {
+    color: COLORS.saffron,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  removeButton: {
+    marginLeft: 12,
+    padding: 6,
+  },
+
+  removeText: {
+    fontSize: 18,
+  },
+  bottomGroup: {
+    alignItems: "center",
+    marginTop: "auto",
+    marginBottom: 12,
+  },
+
   inviteBtn: {
     alignSelf: "center",
     marginVertical: 6,
   },
+
   inviteText: {
     color: COLORS.white,
     textDecorationLine: "underline",
   },
 
-  /* Send button */
   sendButton: {
     alignSelf: "center",
     width: "100%",
@@ -344,9 +461,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 5,
-    marginTop: "auto",
-    marginBottom: 12,
+    marginTop: 6,
   },
+
   sendText: {
     fontSize: 20,
     fontWeight: "700",
