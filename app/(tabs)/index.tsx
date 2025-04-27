@@ -53,9 +53,6 @@ export default function TabOneScreen() {
   }, [loading, session]);
 
   // don’t render your Home UI until we know auth state
-  if (loading || !session) {
-    return null; // or a <LoadingSpinner/> if you like
-  }
   useEffect(() => {
     (async () => {
       const { status } = await Contacts.requestPermissionsAsync();
@@ -166,6 +163,10 @@ export default function TabOneScreen() {
       console.error(e);
     }
   }, []);
+
+  if (loading || !session) {
+    return null; // or a <LoadingSpinner/> if you like
+  }
 
   /* ──────────────────────────────── UI ───────────────────────────────── */
 
