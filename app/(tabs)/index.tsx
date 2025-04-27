@@ -13,7 +13,10 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
+import { useRouter } from "expo-router";
 import * as Contacts from "expo-contacts";
+
+import { useAuth } from "../../context/AuthContext";
 import { COLORS, GLOBAL, SIZES } from "../../constants/Styles";
 
 const LANGUAGES = [
@@ -39,6 +42,20 @@ export default function TabOneScreen() {
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
+  const { session, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !session) {
+      // replace current route with login
+      router.replace("/auth/LoginScreen");
+    }
+  }, [loading, session]);
+
+  // don’t render your Home UI until we know auth state
+  if (loading || !session) {
+    return null; // or a <LoadingSpinner/> if you like
+  }
   useEffect(() => {
     (async () => {
       const { status } = await Contacts.requestPermissionsAsync();
