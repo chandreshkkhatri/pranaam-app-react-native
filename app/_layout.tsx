@@ -10,7 +10,6 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
 import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -77,6 +76,17 @@ export default function RootLayout() {
 function InnerLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const { session, loading } = useAuth(); // ← NEW
+
+  useEffect(() => {
+    if (loading) return; // still restoring; stay on splash
+
+    if (session) {
+      router.replace("/(tabs)"); // user already logged-in
+    } else {
+      router.replace("/auth/LoginScreen"); // no session → auth flow
+    }
+  }, [loading, session]);
 
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(
@@ -92,12 +102,20 @@ function InnerLayout() {
     return () => subscription.remove(); // clean up when unmount
   }, []);
 
+  if (loading) return null;
+
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="auth/LoginScreen" />
-        <Stack.Screen name="auth/SignUpScreen" />
+        {session ? (
+          <Stack.Screen name="(tabs)" />
+        ) : (
+          <>
+            {" "}
+            <Stack.Screen name="auth/LoginScreen" />
+            <Stack.Screen name="auth/SignUpScreen" />
+          </>
+        )}
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

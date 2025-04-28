@@ -1,19 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type Session = {
-  user: {
-    id: string;
-    email: string;
-  };
+import type { Session } from "@supabase/supabase-js";
+
+type AuthCtx = {
+  session: Session | null; // ← keep the whole supabase session
+  loading: boolean;
+  signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<{
-  session: Session | null;
-  loading: boolean;
-}>({
+const AuthContext = createContext<AuthCtx>({
   session: null,
   loading: true,
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -21,34 +20,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setSession({
-          user: { id: session.user.id, email: session.user.email! },
-        });
-      }
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setSession(session ?? null);
       setLoading(false);
-    });
+    })();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          setSession({
-            user: { id: session.user.id, email: session.user.email! },
-          });
-        } else {
-          setSession(null);
-        }
-      }
+    /** 2. React to future auth changes (login / logout / token refresh) */
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) =>
+      setSession(session ?? null)
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    // session state will automatically flip to null via the listener
+  };
+
   return (
-    <AuthContext.Provider value={{ session, loading }}>
+    <AuthContext.Provider value={{ session, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );
