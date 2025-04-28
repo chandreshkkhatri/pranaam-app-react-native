@@ -11,19 +11,18 @@ import { useEffect } from "react";
 import "react-native-reanimated";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-async function registerForPushNotificationsAsync() {
-  let token;
-
-  if (Constants.isDevice) {
+export async function registerForPushNotificationsAsync() {
+  try {
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
 
+    let finalStatus = existingStatus;
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
@@ -34,13 +33,12 @@ async function registerForPushNotificationsAsync() {
       return;
     }
 
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log("Expo Push Token:", token);
-  } else {
-    alert("Must use physical device for Push Notifications");
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const token = tokenData.data;
+    return token;
+  } catch (error) {
+    console.error("Error in registering for push notifications:", error);
   }
-
-  return token;
 }
 
 SplashScreen.preventAutoHideAsync();
@@ -78,12 +76,28 @@ export default function RootLayout() {
 
 function InnerLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      ({ notification }) => {
+        console.log("Tapped Notification:", notification.request.content);
+
+        // optionally, navigate somewhere
+        // router.push("/(tabs)/index");
+        // or router.push("/some-custom-screen");
+      }
+    );
+
+    return () => subscription.remove(); // clean up when unmount
+  }, []);
+
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="auth/LoginScreen" />
-        <Stack.Screen name="auth/SignupScreen" />
+        <Stack.Screen name="auth/SignUpScreen" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

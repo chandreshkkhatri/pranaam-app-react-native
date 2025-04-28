@@ -23,7 +23,12 @@ export default function LoginScreen() {
       <TextInput
         value={email}
         onChangeText={setEmail}
+        placeholder="Email"
+        keyboardType="email-address"
         autoCapitalize="none"
+        autoComplete="email" // 🔥
+        textContentType="emailAddress" // 🔥
+        importantForAutofill="yes"
         style={{ borderWidth: 1, marginBottom: 12 }}
       />
 
@@ -32,6 +37,10 @@ export default function LoginScreen() {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        autoCapitalize="none"
+        autoComplete="password"
+        textContentType="password"
+        importantForAutofill="yes"
         style={{ borderWidth: 1, marginBottom: 12 }}
       />
 

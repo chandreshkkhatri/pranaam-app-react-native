@@ -16,6 +16,7 @@ import {
 import { useRouter } from "expo-router";
 import * as Contacts from "expo-contacts";
 
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS, GLOBAL, SIZES } from "../../constants/Styles";
 
@@ -139,19 +140,24 @@ export default function TabOneScreen() {
     });
   }, []);
 
-  const sendPranaam = useCallback(() => {
+  const sendPranaam = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
-    setRecipients((prev) =>
-      prev
-        .map((r) =>
-          selectedIds.has(r.id) ? { ...r, lastUsedAt: Date.now() } : r
-        )
-        .sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0))
+    const { error } = await supabase.from("notifications").insert(
+      Array.from(selectedIds).map((recipientId) => ({
+        sender: session?.user.id,
+        recipient: recipientId,
+        title: "जय श्री राम 🙏",
+        body: "You have received a Pranaam!",
+      }))
     );
-    Alert.alert("जय श्री राम 🙏", "Greeting sent!");
-    setSelectedIds(new Set());
-  }, [selectedIds]);
+
+    if (error) {
+      console.error("Failed to send notification:", error.message);
+      Alert.alert("Error", "Failed to send Pranaam. Try again!");
+      return;
+    }
+  }, [selectedIds, session?.user.id]);
 
   const inviteOthers = useCallback(async () => {
     try {

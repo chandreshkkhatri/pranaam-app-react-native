@@ -21,17 +21,27 @@ export default function SignupScreen() {
     <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
       <Text>Email</Text>
       <TextInput
+        placeholder="Email"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        autoComplete="email" // 🔥
+        textContentType="emailAddress" // 🔥
+        importantForAutofill="yes"
+        keyboardType="email-address"
         style={{ borderWidth: 1, marginBottom: 12 }}
       />
 
       <Text>Password</Text>
       <TextInput
+        placeholder="Password"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
+        importantForAutofill="yes"
         style={{ borderWidth: 1, marginBottom: 12 }}
       />
 
