@@ -18,18 +18,13 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { supabase } from "../../lib/supabase";
 
-export default function SignUpScreen() {
+export default function ForgotPasswordScreen() {
   const router = useRouter();
-
-  /* ───────────── state ───────────── */
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
 
-  /* ───────────── validation ───────────── */
+  /* ── validation ── */
   const validateEmail = (value: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!value) {
@@ -44,37 +39,24 @@ export default function SignUpScreen() {
     return true;
   };
 
-  const validatePassword = (value: string) => {
-    if (!value) {
-      setPasswordError("Password is required");
-      return false;
-    }
-    if (value.length < 6) {
-      setPasswordError("Password must be at least 6 characters");
-      return false;
-    }
-    setPasswordError("");
-    return true;
-  };
-
-  /* ───────────── sign-up API call ───────────── */
-  async function handleSignUp() {
-    const okEmail = validateEmail(email);
-    const okPass = validatePassword(password);
-    if (!okEmail || !okPass) return;
-
+  /* ── request reset link ── */
+  async function handleReset() {
+    if (!validateEmail(email)) return;
     setLoading(true);
+
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: "pranaam://reset", // deep-link after user sets new pwd
+      });
 
       if (error) {
-        Alert.alert("Sign-up Failed", error.message);
+        Alert.alert("Error", error.message);
       } else {
         Alert.alert(
-          "Success",
-          "We’ve sent you a confirmation email. Verify it, then sign in!"
+          "Email sent",
+          "Check your inbox for a link to reset your password."
         );
-        router.replace("/auth/LoginScreen");
+        router.back();
       }
     } catch {
       Alert.alert("Error", "Something went wrong. Please try again.");
@@ -83,7 +65,6 @@ export default function SignUpScreen() {
     }
   }
 
-  /* ───────────── UI ───────────── */
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -92,18 +73,17 @@ export default function SignUpScreen() {
         style={styles.keyboardAvoidingView}
       >
         <View style={styles.content}>
-          {/* header */}
+          {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>प्रणाम</Text>
             </View>
-            <Text style={styles.welcomeText}>Create Account</Text>
-            <Text style={styles.subtitleText}>Sign up to get started</Text>
+            <Text style={styles.welcomeText}>Forgot Password</Text>
+            <Text style={styles.subtitleText}>Enter your registered email</Text>
           </View>
 
-          {/* form */}
+          {/* Form */}
           <View style={styles.form}>
-            {/* email */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Email</Text>
               <View
@@ -135,80 +115,27 @@ export default function SignUpScreen() {
                   onBlur={() => validateEmail(email)}
                 />
               </View>
-              {emailError ? (
-                <Text style={styles.errorText}>{emailError}</Text>
-              ) : null}
+              {emailError && <Text style={styles.errorText}>{emailError}</Text>}
             </View>
 
-            {/* password */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  passwordError ? styles.inputError : null,
-                ]}
-              >
-                <Feather
-                  name="lock"
-                  size={18}
-                  color="#666"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  value={password}
-                  onChangeText={(t) => {
-                    setPassword(t);
-                    if (passwordError) validatePassword(t);
-                  }}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoComplete="password"
-                  textContentType="password"
-                  importantForAutofill="yes"
-                  style={styles.input}
-                  placeholder="Create a password"
-                  placeholderTextColor="#999"
-                  onBlur={() => validatePassword(password)}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.passwordToggle}
-                >
-                  <Feather
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={18}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-              </View>
-              {passwordError ? (
-                <Text style={styles.errorText}>{passwordError}</Text>
-              ) : null}
-            </View>
-
-            {/* sign-up button */}
             <TouchableOpacity
-              onPress={handleSignUp}
+              onPress={handleReset}
               style={styles.loginButton}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.loginButtonText}>Sign Up</Text>
+                <Text style={styles.loginButtonText}>Send Reset Link</Text>
               )}
             </TouchableOpacity>
 
-            {/* link back to sign-in */}
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Already have an account? </Text>
-              <TouchableOpacity
-                onPress={() => router.push("/auth/LoginScreen")}
-              >
-                <Text style={styles.signupLinkText}>Sign In</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ alignSelf: "center" }}
+            >
+              <Text style={styles.signupLinkText}>Back to Sign In</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -216,7 +143,7 @@ export default function SignUpScreen() {
   );
 }
 
-/* styles identical to the login screen */
+/* === reused styles from LoginScreen === */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FA" },
   keyboardAvoidingView: { flex: 1 },
@@ -266,7 +193,6 @@ const styles = StyleSheet.create({
   inputError: { borderColor: "#FF3B30" },
   inputIcon: { marginRight: 10 },
   input: { flex: 1, height: "100%", fontSize: 16, color: "#333" },
-  passwordToggle: { padding: 8 },
   errorText: { color: "#FF3B30", fontSize: 12, marginTop: 4, marginLeft: 4 },
 
   loginButton: {
@@ -284,11 +210,5 @@ const styles = StyleSheet.create({
   },
   loginButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
-  signupContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  signupText: { color: "#666", fontSize: 14 },
   signupLinkText: { color: "#FF9933", fontSize: 14, fontWeight: "600" },
 });

@@ -54,13 +54,6 @@ export default function TabOneScreen() {
   const { session, loading } = useAuth();
   const router = useRouter();
 
-  // Authentication check
-  useEffect(() => {
-    if (!loading && !session) {
-      router.replace("/auth/LoginScreen");
-    }
-  }, [loading, session]);
-
   // Contact permissions and loading
   useEffect(() => {
     (async () => {
