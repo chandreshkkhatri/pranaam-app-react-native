@@ -31,13 +31,14 @@ const LANGUAGES = [
 
 type Recipient = {
   id: string;
+  auth_id?: string;
   name: string;
   number: string;
   registered?: boolean;
   lastUsedAt?: number;
 };
 
-type Registered = { id: string; phone: string };
+type Registered = { id: string; phone: string; auth_id: string };
 
 export default function TabOneScreen() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
@@ -94,7 +95,7 @@ export default function TabOneScreen() {
       /* 3) one Supabase call to see who’s registered -------------- */
       const { data: rows, error } = await supabase
         .from("users") // ← NEW TABLE
-        .select("id, phone_e164")
+        .select("id, auth_id, phone_e164")
         .in("phone_e164", numbers);
 
       if (error) {
@@ -105,7 +106,11 @@ export default function TabOneScreen() {
       /* 4) local Map<phone, {id, phone}> for quick look-ups ------- */
       const map = new Map<string, Registered>();
       rows?.forEach((r) =>
-        map.set(r.phone_e164, { id: r.id, phone: r.phone_e164 })
+        map.set(r.phone_e164, {
+          id: r.id,
+          auth_id: r.auth_id,
+          phone: r.phone_e164,
+        })
       );
       setRegistered(map);
     })();
@@ -143,6 +148,7 @@ export default function TabOneScreen() {
 
         results.push({
           id: key,
+          auth_id: reg?.auth_id,
           name: contact.name,
           number: phoneE164,
           registered: !!reg,
@@ -201,14 +207,14 @@ export default function TabOneScreen() {
     if (selectedIds.size === 0) return;
 
     const payload = Array.from(selectedIds)
-      .filter((id) => !id.startsWith("local_")) // skip non-users
-      .map((id) => ({
+      .map((id) => recipients.find((r) => r.id === id))
+      .filter((r): r is Recipient => !!r && !!r.auth_id)
+      .map((r) => ({
         sender: session!.user.id,
-        recipient: id,
+        recipient: r.auth_id,
         title: "जय श्री राम 🙏",
         body: "You have received a Pranaam!",
       }));
-
     const { error } = await supabase.from("notifications").insert(payload);
 
     if (error) {
