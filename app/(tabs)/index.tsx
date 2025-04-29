@@ -18,6 +18,7 @@ import {
 import { useRouter } from "expo-router";
 import * as Contacts from "expo-contacts";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { E164Number, parsePhoneNumber } from "libphonenumber-js/min";
 
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -32,13 +33,19 @@ type Recipient = {
   id: string;
   name: string;
   number: string;
+  registered?: boolean;
   lastUsedAt?: number;
 };
+
+type Registered = { id: string; phone: string };
 
 export default function TabOneScreen() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
+  const [registered, setRegistered] = useState<Map<string, Registered>>(
+    new Map()
+  );
   const [query, setQuery] = useState("");
   const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
   const [language, setLanguage] = useState(LANGUAGES[0]);
@@ -57,6 +64,7 @@ export default function TabOneScreen() {
   // Contact permissions and loading
   useEffect(() => {
     (async () => {
+      /* 1) device permission + contacts -------------------------- */
       const { status } = await Contacts.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
@@ -71,15 +79,50 @@ export default function TabOneScreen() {
       const { data } = await Contacts.getContactsAsync({
         fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
       });
+      const contacts = data.filter((c) => c.name && c.phoneNumbers?.length);
+      setDeviceContacts(contacts);
 
-      setDeviceContacts(data.filter((c) => c.name && c.phoneNumbers?.length));
+      /* 2) build list of E.164 phone numbers ---------------------- */
+      const numbers = contacts
+        .flatMap((c) => c.phoneNumbers ?? [])
+        .map((p) => p.number) // string | undefined
+        .filter((n): n is string => !!n) // ⬅️ keep only real strings
+        .map((n) => {
+          try {
+            return parsePhoneNumber(n, "IN")?.number ?? null; // E.164 or null
+          } catch {
+            return null; // ignore bad formats
+          }
+        })
+        .filter((n): n is E164Number => !!n);
+
+      if (numbers.length === 0) return;
+
+      /* 3) one Supabase call to see who’s registered -------------- */
+      const { data: rows, error } = await supabase
+        .from("users") // ← NEW TABLE
+        .select("id, phone_e164")
+        .in("phone_e164", numbers);
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      /* 4) local Map<phone, {id, phone}> for quick look-ups ------- */
+      const map = new Map<string, Registered>();
+      rows?.forEach((r) =>
+        map.set(r.phone_e164, { id: r.id, phone: r.phone_e164 })
+      );
+      setRegistered(map);
     })();
   }, [language.code]);
 
   // Filter contacts based on search query
-  const filteredContacts = useMemo(() => {
-    const lowerQuery = query.toLowerCase();
-    const results: { id: string; name: string; number: string }[] = [];
+  const filteredContacts = useMemo<Recipient[]>(() => {
+    const lowerQuery = query.toLowerCase().replace(/\s+/g, ""); // trim spaces
+    const results: Recipient[] = [];
+    const seen = new Set<string>();
 
     deviceContacts.forEach((contact, contactIndex) => {
       if (!contact.id || !contact.name) return;
@@ -87,40 +130,55 @@ export default function TabOneScreen() {
       contact.phoneNumbers?.forEach((phone, phoneIndex) => {
         if (!phone.number) return;
 
-        const nameMatch = contact.name.toLowerCase().includes(lowerQuery);
-        const numberMatch = phone.number
-          .replace(/\s+/g, "")
-          .includes(lowerQuery);
-
-        if (nameMatch || numberMatch) {
-          results.push({
-            id: `${contact.id}_${contactIndex}_${phoneIndex}`,
-            name: contact.name,
-            number: phone.number,
-          });
+        let phoneE164: string | null = null;
+        try {
+          phoneE164 = parsePhoneNumber(phone.number, "IN")?.number ?? null;
+        } catch {
+          /* ignore invalid numbers */
         }
+        if (!phoneE164) return;
+
+        const nameMatch = contact.name.toLowerCase().includes(lowerQuery);
+        const numberMatch = phoneE164.includes(lowerQuery);
+
+        if (!nameMatch && !numberMatch) return;
+
+        const reg = registered.get(phoneE164);
+        const key = reg ? reg.id : `local_${phoneE164}`; // ② single place
+        if (seen.has(key)) return; // ③ skip duplicate
+        seen.add(key);
+
+        results.push({
+          id: key,
+          name: contact.name,
+          number: phoneE164,
+          registered: !!reg,
+        });
       });
     });
 
     return results;
-  }, [deviceContacts, query]);
+  }, [deviceContacts, query, registered]);
 
   // Add a recipient from search results
-  const addRecipient = useCallback(
-    (contact: { id: string; name: string; number: string }) => {
-      setRecipients((prev) => {
-        if (prev.some((r) => r.id === contact.id)) return prev;
-        return [
-          ...prev,
-          { id: contact.id, name: contact.name, number: contact.number },
-        ];
-      });
-      setQuery("");
-      setSearchDropdownVisible(false);
-      Keyboard.dismiss();
-    },
-    []
-  );
+  const addRecipient = useCallback((contact: Recipient) => {
+    if (!contact.registered) {
+      Alert.alert(
+        language.code === "hi"
+          ? "यह संपर्क अभी तक Pranaam पर नहीं है"
+          : "This contact isn’t on Pranaam yet"
+      );
+      return;
+    }
+
+    setRecipients((prev) => {
+      if (prev.some((r) => r.id === contact.id)) return prev;
+      return [...prev, { ...contact }];
+    });
+    setQuery("");
+    setSearchDropdownVisible(false);
+    Keyboard.dismiss();
+  }, []);
 
   // Toggle selection of a recipient
   const toggleRecipientSelection = useCallback((id: string) => {
@@ -149,14 +207,16 @@ export default function TabOneScreen() {
   const sendPranaam = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
-    const { error } = await supabase.from("notifications").insert(
-      Array.from(selectedIds).map((recipientId) => ({
-        sender: session?.user.id,
-        recipient: recipientId,
+    const payload = Array.from(selectedIds)
+      .filter((id) => !id.startsWith("local_")) // skip non-users
+      .map((id) => ({
+        sender: session!.user.id,
+        recipient: id,
         title: "जय श्री राम 🙏",
         body: "You have received a Pranaam!",
-      }))
-    );
+      }));
+
+    const { error } = await supabase.from("notifications").insert(payload);
 
     if (error) {
       console.error("Failed to send notification:", error.message);
@@ -256,7 +316,10 @@ export default function TabOneScreen() {
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <Pressable
-                style={styles.dropdownItem}
+                style={[
+                  styles.dropdownItem,
+                  !item.registered && { opacity: 0.5 } /* dim row */,
+                ]}
                 onPress={() => addRecipient(item)}
               >
                 <View style={styles.contactInfo}>
@@ -271,7 +334,11 @@ export default function TabOneScreen() {
                   </View>
                 </View>
                 <View style={styles.addButton}>
-                  <Feather name="plus" size={16} color="#fff" />
+                  {item.registered ? (
+                    <Feather name="check" size={16} color="#fff" />
+                  ) : (
+                    <Feather name="lock" size={16} color="#fff" />
+                  )}
                 </View>
               </Pressable>
             )}
