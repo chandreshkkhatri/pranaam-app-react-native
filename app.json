@@ -9,7 +9,6 @@
     "userInterfaceStyle": "automatic",
     "jsEngine": "hermes",
     "newArchEnabled": true,
-    "googleServicesFile": "./google-services.dev.json",
     "ios": {
       "supportsTablet": true
     },
@@ -18,7 +17,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.chandresh.code.pranaam"
+      "package": "com.chandresh.code.pranaam",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",

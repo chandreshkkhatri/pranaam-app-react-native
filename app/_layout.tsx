@@ -3,6 +3,7 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
+import { Platform } from "react-native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -16,9 +17,25 @@ import Constants from "expo-constants";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 export async function registerForPushNotificationsAsync() {
   try {
+    if (Platform.OS === "android") {
+      Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#FF231F7C",
+      });
+    }
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
     console.log("Existing Notification Status:", existingStatus);
