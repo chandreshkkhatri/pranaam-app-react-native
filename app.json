@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "jsEngine": "hermes",
     "newArchEnabled": true,
+    "googleServicesFile": "./google-services.dev.json",
     "ios": {
       "supportsTablet": true
     },
@@ -33,6 +34,15 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false,
+            "useNextNotificationsApi": true
+          }
         }
       ]
     ],
