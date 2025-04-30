@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import "react-native-reanimated";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "../context/AuthContext";
@@ -20,19 +21,26 @@ export async function registerForPushNotificationsAsync() {
   try {
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
+    console.log("Existing Notification Status:", existingStatus);
 
     let finalStatus = existingStatus;
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      console.log("Requested Notification Status:", status);
     }
 
     if (finalStatus !== "granted") {
       alert("Failed to get push token for push notification!");
       return;
     }
-
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+    console.log("Expo Push Token Data:", tokenData);
     const token = tokenData.data;
     return token;
   } catch (error) {
@@ -107,15 +115,9 @@ function InnerLayout() {
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
-        {session ? (
-          <Stack.Screen name="(tabs)" />
-        ) : (
-          <>
-            {" "}
-            <Stack.Screen name="auth/LoginScreen" />
-            <Stack.Screen name="auth/SignUpScreen" />
-          </>
-        )}
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="auth/LoginScreen" />
+        <Stack.Screen name="auth/SignUpScreen" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

@@ -44,6 +44,8 @@ google-services.preview.json
 google-services.prod.json
 google-services.json
 
+*-firebase-adminsdk*
+
 android/
 ios/
 
