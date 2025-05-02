@@ -109,7 +109,7 @@ function InnerLayout() {
     if (session) {
       router.replace("/(tabs)"); // user already logged-in
     } else {
-      router.replace("/auth/LoginScreen"); // no session → auth flow
+      router.replace("/auth/PhoneOtpScreen"); // no session → auth flow
     }
   }, [loading, session]);
 
