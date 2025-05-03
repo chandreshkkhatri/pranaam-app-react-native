@@ -1,23 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
-  FlatList,
-  Keyboard,
   Pressable,
   SafeAreaView,
   Share,
   StyleSheet,
   Text,
-  TextInput,
   View,
   Platform,
   StatusBar,
 } from "react-native";
-import * as Contacts from "expo-contacts";
-import { Feather, MaterialIcons } from "@expo/vector-icons";
-import { E164Number, parsePhoneNumber } from "libphonenumber-js/min";
 
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -25,21 +19,16 @@ import { COLORS } from "../../constants/Styles";
 import SearchContacts, { Recipient } from "../../components/SearchContacts";
 import useContacts from "../../hooks/useContacts";
 import RecipientList from "../../components/RecipientList";
+import BottomActions from "../../components/BottomActions";
 
 const LANGUAGES = [
   { code: "en", label: "EN" },
   { code: "hi", label: "हिं" },
 ];
 
-type Registered = { id: string; phone: string; auth_id: string };
-
 export default function TabOneScreen() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
-  // const [registered, setRegistered] = useState<Map<string, Registered>>(
-  //   new Map()
-  // );
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
@@ -144,7 +133,6 @@ export default function TabOneScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
@@ -154,14 +142,12 @@ export default function TabOneScreen() {
           <Text style={styles.langButtonText}>{language.label}</Text>
         </Pressable>
       </View>
-
       <SearchContacts
         deviceContacts={deviceContacts}
         registered={registered}
         language={language}
         onAdd={addRecipient}
       />
-
       {/* Recipients Section */}
       <View style={styles.recipientsSection}>
         <Text style={styles.sectionTitle}>
@@ -179,36 +165,13 @@ export default function TabOneScreen() {
           onRemove={removeRecipient}
         />
       </View>
-
-      {/* Bottom Actions */}
-      <View style={styles.bottomActions}>
-        <Pressable style={styles.inviteButton} onPress={inviteOthers}>
-          <Feather name="share-2" size={16} color="#fff" />
-          <Text style={styles.inviteButtonText}>
-            {language.code === "hi"
-              ? "दोस्तों को आमंत्रित करें"
-              : "Invite Friends"}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.pranaamButton,
-            selectedIds.size === 0 && styles.disabledButton,
-          ]}
-          disabled={selectedIds.size === 0}
-          onPress={sendPranaam}
-        >
-          <Text style={styles.pranaamButtonText}>जय श्री राम 🙏</Text>
-          <Text style={styles.pranaamButtonSubtext}>
-            {language.code === "hi"
-              ? `${selectedIds.size} लोगों को भेजें`
-              : `Send to ${selectedIds.size} ${
-                  selectedIds.size === 1 ? "person" : "people"
-                }`}
-          </Text>
-        </Pressable>
-      </View>
+      <BottomActions
+        disabled={selectedIds.size === 0}
+        selectedCount={selectedIds.size}
+        languageCode={language.code as "en" | "hi"}
+        onInvite={inviteOthers}
+        onSend={sendPranaam}
+      />
     </SafeAreaView>
   );
 }
@@ -260,48 +223,5 @@ const styles = StyleSheet.create({
   },
   recipientList: {
     flex: 1,
-  },
-  bottomActions: {
-    padding: 16,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-  },
-  inviteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-    paddingVertical: 8,
-    marginBottom: 12,
-  },
-  inviteButtonText: {
-    color: COLORS.saffron,
-    fontWeight: "500",
-    marginLeft: 8,
-  },
-  pranaamButton: {
-    backgroundColor: COLORS.saffron,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  pranaamButtonText: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  pranaamButtonSubtext: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 14,
-    marginTop: 4,
   },
 });
