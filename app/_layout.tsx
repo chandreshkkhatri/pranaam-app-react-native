@@ -129,8 +129,7 @@ function InnerLayout() {
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="auth/LoginScreen" />
-        <Stack.Screen name="auth/SignUpScreen" />
+        <Stack.Screen name="auth/PhoneOtpScreen" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
