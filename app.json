@@ -14,7 +14,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/pranaam-logo.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.chandresh.code.pranaam",

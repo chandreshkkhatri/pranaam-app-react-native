@@ -25,7 +25,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 export async function registerForPushNotificationsAsync() {
   try {
     if (Platform.OS === "android") {
@@ -38,13 +37,11 @@ export async function registerForPushNotificationsAsync() {
     }
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
-    console.log("Existing Notification Status:", existingStatus);
 
     let finalStatus = existingStatus;
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
-      console.log("Requested Notification Status:", status);
     }
 
     if (finalStatus !== "granted") {
@@ -57,7 +54,6 @@ export async function registerForPushNotificationsAsync() {
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
-    console.log("Expo Push Token Data:", tokenData);
     const token = tokenData.data;
     return token;
   } catch (error) {
