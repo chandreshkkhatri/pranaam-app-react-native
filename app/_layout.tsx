@@ -16,6 +16,7 @@ import Constants from "expo-constants";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -55,6 +56,23 @@ export async function registerForPushNotificationsAsync() {
       projectId,
     });
     const token = tokenData.data;
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
+    if (userErr || !user) {
+      console.warn("Push: no user to attach token to");
+      return;
+    }
+    const { error } = await supabase
+      .from("device_tokens")
+      .upsert(
+        { user_id: user.id, expo_token: token },
+        { onConflict: "expo_token" }
+      );
+    if (error) {
+      console.error(error);
+    }
     return token;
   } catch (error) {
     console.error("Error in registering for push notifications:", error);

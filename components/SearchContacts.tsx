@@ -7,15 +7,17 @@ import {
   Text,
   Keyboard,
   StyleSheet,
+  Share,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Contacts from "expo-contacts";
 import { E164Number, parsePhoneNumber } from "libphonenumber-js/min";
 
 import { COLORS } from "../constants/Styles";
+import { normalise } from "../utils/phone";
 
 /* --------------------------------- types --------------------------------- */
-type Registered = { id: string; phone: string; auth_id: string };
+type Registered = { id: string; phone: string };
 
 export type Recipient = {
   id: string;
@@ -67,14 +69,13 @@ export default function SearchContacts({
         const match = c.name.toLowerCase().includes(q) || phoneE164.includes(q);
         if (!match) return;
 
-        const reg = registered.get(phoneE164);
+        const reg = registered.get(normalise(phoneE164));
         const key = reg ? reg.id : `local_${phoneE164}`;
         if (seen.has(key)) return;
         seen.add(key);
 
         results.push({
           id: key,
-          auth_id: reg?.auth_id,
           name: c.name!,
           number: phoneE164,
           registered: !!reg,
@@ -161,13 +162,24 @@ export default function SearchContacts({
                     <Text style={styles.contactNumber}>{item.number}</Text>
                   </View>
                 </View>
-                <View style={styles.addButton}>
-                  <Feather
-                    name={item.registered ? "check" : "lock"}
-                    size={16}
-                    color="#fff"
-                  />
-                </View>
+                {item.registered ? (
+                  <View style={styles.addButton}>
+                    <Feather name="check" size={16} color="#fff" />
+                  </View>
+                ) : (
+                  <Pressable
+                    style={styles.invitePill} // tiny rounded pill
+                    onPress={() =>
+                      Share.share({
+                        message: `I’m on Pranaam! Join me: https://pranaam.app`,
+                      })
+                    }
+                  >
+                    <Text style={styles.invitePillText}>
+                      {language.code === "hi" ? "आमंत्रित करें" : "Invite"}
+                    </Text>
+                  </Pressable>
+                )}
               </Pressable>
             )}
             ListEmptyComponent={() => (
@@ -269,4 +281,11 @@ const styles = StyleSheet.create({
     padding: 16,
     color: "#999",
   },
+  invitePill: {
+    backgroundColor: COLORS.saffron,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  invitePillText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 });

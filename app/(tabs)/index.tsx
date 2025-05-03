@@ -81,19 +81,17 @@ export default function TabOneScreen() {
 
   // Send Pranaam to selected recipients
   const sendPranaam = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-
     const payload = Array.from(selectedIds)
       .map((id) => recipients.find((r) => r.id === id))
-      .filter((r): r is Recipient => !!r && !!r.auth_id)
+      .filter((r): r is Recipient => !!r)
       .map((r) => ({
         sender: session!.user.id,
-        recipient: r.auth_id,
+        recipient: r.id,
         title: "जय श्री राम 🙏",
         body: "You have received a Pranaam!",
       }));
     const { error } = await supabase.from("notifications").insert(payload);
-
+    console.log("Sending Pranaam", payload);
     if (error) {
       console.error("Failed to send notification:", error.message);
       Alert.alert("Error", "Failed to send Pranaam. Try again!");

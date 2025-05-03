@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import * as Contacts from "expo-contacts";
 import { parsePhoneNumber, E164Number } from "libphonenumber-js/min";
 import { supabase } from "../lib/supabase";
+import { normalise } from "../utils/phone";
 
-export type Registered = { id: string; auth_id: string; phone: string };
+export type Registered = { id: string; phone: string };
 
 export default function useContacts(languageCode: "en" | "hi") {
   const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
@@ -38,18 +39,17 @@ export default function useContacts(languageCode: "en" | "hi") {
       if (numbers.length === 0) return;
 
       const { data: rows } = await supabase
-        .from("users")
-        .select("id, auth_id, phone_e164")
+        .from("profiles")
+        .select("id, phone_e164")
         .in("phone_e164", numbers);
 
       const map = new Map<string, Registered>();
-      rows?.forEach((r) =>
-        map.set(r.phone_e164, {
-          id: r.id,
-          auth_id: r.auth_id,
-          phone: r.phone_e164,
-        })
-      );
+      rows?.forEach((r) => {
+        map.set(normalise(r.phone_e164), {
+              id: r.id,
+              phone: r.phone_e164,
+            })
+      });            
       setRegistered(map);
     })();
   }, [languageCode]);
