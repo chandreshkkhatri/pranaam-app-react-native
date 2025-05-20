@@ -32,9 +32,9 @@ export default function BottomActions({
       <Pressable
         style={[
           styles.pranaamButton,
-          selectedCount === 0 && styles.disabledButton,
+          disabled && styles.disabledButton,
         ]}
-        disabled={selectedCount === 0}
+        disabled={disabled}
         onPress={sendPranaam}
       >
         <Text style={styles.pranaamButtonText}>जय श्री राम 🙏</Text>
