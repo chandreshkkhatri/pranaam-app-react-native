@@ -1,6 +1,3 @@
-// app/auth/PhoneOtpScreen.tsx
-"use client";
-
 import { useState } from "react";
 import {
   View,
