@@ -75,6 +75,24 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          id: string
+          phone_e164: string
+          created_at: string | null
+        }
+        Insert: {
+          id: string
+          phone_e164: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          phone_e164?: string
+          created_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
